@@ -1,0 +1,57 @@
+---
+
+
+name: "prod image build and deployment"
+
+on:
+
+  push:
+    branches:
+      - prod
+      
+
+jobs:
+
+   build:
+
+     runs-on: ubuntu-latest
+     env:
+        packer_version: "1.9.4"
+
+     steps:
+
+       - name: "checkout repository"
+         uses: actions/checkout@v3
+         
+       - name: "Packer installation"
+         uses: hashicorp/setup-packer@main
+         with:
+           version: ${{ env.packer_version }}
+
+       - name: "packer init"
+         run: packer init .
+         working-directory: ./packer/
+
+       - name: "packer validate"
+         run: packer validate -var-file="prod.pkvars.hcl" .
+         working-directory: ./packer/  
+
+       - name: "format packer template"
+         run: packer fmt .
+         working-directory: ./packer/
+
+       - name: "packer build image"
+         run: packer build -var-file="prod.pkvars.hcl" .
+         working-directory: ./packer/
+         env:
+           AWS_ACCESS_KEY_ID:  ${{ secrets.PROD_ACCESS_KEY }}
+           AWS_SECRET_ACCESS_KEY:  ${{ secrets.PROD_SECRET_KEY }}
+           AWS_DEFAULT_REGION:  ${{ secrets.PROD_REGION }}
+       
+       - name: "Notify prod deploy job"
+         uses: peter-evans/repository-dispatch@v2
+         with:
+           token:  ${{ secrets.PAT }}
+           repository: JesniJacob/shopping-application-infra-repo
+           event-type: prod-deploy-event      
+
